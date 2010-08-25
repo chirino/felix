@@ -23,52 +23,65 @@ import org.osgi.service.threadio.ThreadIO;
 
 import java.io.InputStream;
 import java.io.PrintStream;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
 
 public class ThreadIOImpl implements ThreadIO
 {
     static private final Logger log = Logger.getLogger(ThreadIOImpl.class.getName());
-    ThreadPrintStream err = new ThreadPrintStream(System.err);
-    ThreadPrintStream out = new ThreadPrintStream(System.out);
-    ThreadInputStream in = new ThreadInputStream(System.in);
+
+    static class Streams {
+        ThreadInputStream in = new ThreadInputStream(this, System.in);
+        ThreadPrintStream err = new ThreadPrintStream(System.err);
+        ThreadPrintStream out = new ThreadPrintStream(System.out);
+        AtomicInteger retained = new AtomicInteger(1);
+    }
+
     ThreadLocal<Marker> current = new InheritableThreadLocal<Marker>();
+    Streams streams;
 
     public void start()
     {
-        if (System.out instanceof ThreadPrintStream)
+        if (System.in instanceof ThreadInputStream)
         {
-            throw new IllegalStateException("Thread Print Stream already set");
+            ThreadInputStream in = (ThreadInputStream) System.in;
+            streams = in.tracker;
+            streams.retained.incrementAndGet();
+        } else {
+            streams = new Streams();
+            System.setOut(streams.out);
+            System.setIn(streams.in);
+            System.setErr(streams.err);
         }
-        System.setOut(out);
-        System.setIn(in);
-        System.setErr(err);
     }
 
     public void stop()
     {
-        System.setErr(err.dflt);
-        System.setOut(out.dflt);
-        System.setIn(in.dflt);
+        if( streams.retained.decrementAndGet()==0 ) {
+            System.setErr(streams.err.dflt);
+            System.setOut(streams.out.dflt);
+            System.setIn(streams.in.dflt);
+        }
     }
 
     private void checkIO()
     { // derek
-        if (System.in != in)
+        if (System.in != streams.in)
         {
             log.fine("ThreadIO: eek! who's set System.in=" + System.in);
-            System.setIn(in);
+            System.setIn(streams.in);
         }
 
-        if (System.out != out)
+        if (System.out != streams.out)
         {
             log.fine("ThreadIO: eek! who's set System.out=" + System.out);
-            System.setOut(out);
+            System.setOut(streams.out);
         }
 
-        if (System.err != err)
+        if (System.err != streams.err)
         {
             log.fine("ThreadIO: eek! who's set System.err=" + System.err);
-            System.setErr(err);
+            System.setErr(streams.err);
         }
     }
 
@@ -84,9 +97,9 @@ public class ThreadIOImpl implements ThreadIO
         Marker previous = top.previous;
         if (previous == null)
         {
-            in.end();
-            out.end();
-            err.end();
+            streams.in.end();
+            streams.out.end();
+            streams.err.end();
         }
         else
         {

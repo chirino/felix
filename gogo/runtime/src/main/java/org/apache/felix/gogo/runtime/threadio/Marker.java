@@ -40,9 +40,9 @@ public class Marker
 
     Marker activate()
     {
-        parent.in.setStream(in);
-        parent.out.setStream(out);
-        parent.err.setStream(err);
+        parent.streams.in.setStream(in);
+        parent.streams.out.setStream(out);
+        parent.streams.err.setStream(err);
         return previous;
     }
 }

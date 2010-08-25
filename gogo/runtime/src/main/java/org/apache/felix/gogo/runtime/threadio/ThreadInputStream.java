@@ -24,10 +24,12 @@ import java.io.InputStream;
 public class ThreadInputStream extends InputStream
 {
     ThreadLocal<InputStream> map = new InheritableThreadLocal<InputStream>();
+    ThreadIOImpl.Streams tracker;
     InputStream dflt;
 
-    public ThreadInputStream(InputStream in)
+    public ThreadInputStream(ThreadIOImpl.Streams tracker, InputStream in)
     {
+        this.tracker = tracker;
         dflt = in;
     }
 
